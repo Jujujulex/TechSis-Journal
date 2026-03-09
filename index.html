@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TechSis Journal</title>
+<link rel="icon" id="favicon" type="image/png">
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=IBM+Plex+Mono:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -548,6 +549,31 @@
 
   canvas { border-radius: 4px; }
 </style>
+<script>
+(function() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  // Background
+  ctx.fillStyle = '#0a0c0f';
+  ctx.beginPath();
+  ctx.roundRect(0, 0, 64, 64, 12);
+  ctx.fill();
+  // Border
+  ctx.strokeStyle = '#00e5a0';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.roundRect(3, 3, 58, 58, 10);
+  ctx.stroke();
+  // Text
+  ctx.fillStyle = '#00e5a0';
+  ctx.font = 'bold 22px Arial Black, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('TS', 32, 34);
+  document.getElementById('favicon').href = c.toDataURL('image/png');
+})();
+</script>
 </head>
 <body>
 <div class="app">
@@ -577,8 +603,11 @@
   <div class="main">
     <div class="topbar">
       <div class="page-title" id="page-title">DASHBOARD</div>
-      <div style="display:flex;align-items:center;gap:16px;">
+      <div style="display:flex;align-items:center;gap:10px;">
         <div class="topbar-date" id="current-date"></div>
+        <button class="btn btn-ghost" onclick="exportData()" title="Export all your data as a backup file">⬇ EXPORT</button>
+        <button class="btn btn-ghost" onclick="document.getElementById('import-input').click()" title="Import a previously exported backup">⬆ IMPORT</button>
+        <input type="file" id="import-input" accept=".json" style="display:none" onchange="importData(event)">
         <button class="btn btn-primary" onclick="openModal()">+ LOG TRADE</button>
       </div>
     </div>
@@ -1327,6 +1356,50 @@ function deleteRule(i) {
   rules.splice(i, 1);
   localStorage.setItem('edge_rules', JSON.stringify(rules));
   renderRules();
+}
+
+function exportData() {
+  const data = {
+    trades: JSON.parse(localStorage.getItem('edge_trades') || '[]'),
+    openTrades: JSON.parse(localStorage.getItem('edge_open_trades') || '[]'),
+    rules: JSON.parse(localStorage.getItem('edge_rules') || '[]'),
+    moods: JSON.parse(localStorage.getItem('edge_moods') || '[]'),
+    exportedAt: new Date().toISOString()
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'techsis-journal-backup-' + new Date().toISOString().split('T')[0] + '.json';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!confirm('This will replace all your current journal data. Continue?')) return;
+      if (data.trades) localStorage.setItem('edge_trades', JSON.stringify(data.trades));
+      if (data.openTrades) localStorage.setItem('edge_open_trades', JSON.stringify(data.openTrades));
+      if (data.rules) localStorage.setItem('edge_rules', JSON.stringify(data.rules));
+      if (data.moods) localStorage.setItem('edge_moods', JSON.stringify(data.moods));
+      trades = data.trades || [];
+      openTrades = data.openTrades || [];
+      rules = data.rules || [];
+      moodHistory = data.moods || [];
+      renderAll();
+      renderRules();
+      renderMoodHistory();
+      alert('✓ Data imported successfully!');
+    } catch(err) {
+      alert('Invalid backup file. Please use a file exported from TechSis Journal.');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 document.getElementById('new-rule-input').addEventListener('keydown', e => { if (e.key === 'Enter') addRule(); });
